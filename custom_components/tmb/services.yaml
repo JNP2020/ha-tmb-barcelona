@@ -1,0 +1,42 @@
+plan_trip:
+  name: Plan a trip
+  description: >-
+    Look up point-to-point public transport itineraries between two
+    coordinates using TMB's trip planner.
+  fields:
+    from_latitude:
+      name: From latitude
+      description: Latitude of the trip's starting point.
+      required: true
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: any
+    from_longitude:
+      name: From longitude
+      description: Longitude of the trip's starting point.
+      required: true
+      selector:
+        number:
+          min: -180
+          max: 180
+          step: any
+    to_latitude:
+      name: To latitude
+      description: Latitude of the trip's destination.
+      required: true
+      selector:
+        number:
+          min: -90
+          max: 90
+          step: any
+    to_longitude:
+      name: To longitude
+      description: Longitude of the trip's destination.
+      required: true
+      selector:
+        number:
+          min: -180
+          max: 180
+          step: any

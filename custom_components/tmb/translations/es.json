@@ -1,0 +1,99 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Conectar con TMB",
+        "description": "Introduce el app_id y la app_key de tu cuenta de desarrollador de TMB (https://developer.tmb.cat/).",
+        "data": {
+          "app_id": "App ID",
+          "app_key": "App Key"
+        }
+      },
+      "mode": {
+        "title": "Elige un modo de transporte",
+        "data": {
+          "mode": "Modo"
+        }
+      },
+      "line": {
+        "title": "Elige una línea",
+        "data": {
+          "line_code": "Línea"
+        }
+      },
+      "stop": {
+        "title": "Elige una parada",
+        "data": {
+          "stop_code": "Parada"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reautenticar TMB",
+        "description": "Tu app_id/app_key de TMB ya no es válido. Introduce nuevas credenciales.",
+        "data": {
+          "app_id": "App ID",
+          "app_key": "App Key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "app_id/app_key no válidos.",
+      "cannot_connect": "No se ha podido conectar con la API de TMB."
+    },
+    "abort": {
+      "already_configured": "TMB ya está configurado.",
+      "reauth_successful": "La reautenticación se ha completado correctamente."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opciones de TMB",
+        "menu_options": {
+          "add_stop": "Añadir una parada",
+          "remove_stop": "Eliminar una parada",
+          "credentials": "Actualizar credenciales"
+        }
+      },
+      "credentials": {
+        "title": "Actualizar credenciales",
+        "data": {
+          "app_id": "App ID",
+          "app_key": "App Key"
+        }
+      },
+      "add_stop": {
+        "title": "Elige un modo de transporte",
+        "data": {
+          "mode": "Modo"
+        }
+      },
+      "add_stop_line": {
+        "title": "Elige una línea",
+        "data": {
+          "line_code": "Línea"
+        }
+      },
+      "add_stop_confirm": {
+        "title": "Elige una parada",
+        "data": {
+          "stop_code": "Parada"
+        }
+      },
+      "remove_stop": {
+        "title": "Eliminar paradas",
+        "data": {
+          "stop_code": "Paradas a eliminar"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "app_id/app_key no válidos.",
+      "cannot_connect": "No se ha podido conectar con la API de TMB."
+    },
+    "abort": {
+      "no_stops_configured": "Actualmente no hay ninguna parada configurada.",
+      "cannot_connect": "No se ha podido conectar con la API de TMB."
+    }
+  }
+}

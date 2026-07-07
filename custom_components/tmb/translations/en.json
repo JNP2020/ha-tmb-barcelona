@@ -1,0 +1,99 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to TMB",
+        "description": "Enter the app_id and app_key from your TMB developer account (https://developer.tmb.cat/).",
+        "data": {
+          "app_id": "App ID",
+          "app_key": "App Key"
+        }
+      },
+      "mode": {
+        "title": "Choose a transport mode",
+        "data": {
+          "mode": "Mode"
+        }
+      },
+      "line": {
+        "title": "Choose a line",
+        "data": {
+          "line_code": "Line"
+        }
+      },
+      "stop": {
+        "title": "Choose a stop",
+        "data": {
+          "stop_code": "Stop"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Reauthenticate TMB",
+        "description": "Your TMB app_id/app_key is no longer valid. Enter new credentials.",
+        "data": {
+          "app_id": "App ID",
+          "app_key": "App Key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid app_id/app_key.",
+      "cannot_connect": "Could not connect to the TMB API."
+    },
+    "abort": {
+      "already_configured": "TMB is already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "TMB options",
+        "menu_options": {
+          "add_stop": "Add a stop",
+          "remove_stop": "Remove a stop",
+          "credentials": "Update credentials"
+        }
+      },
+      "credentials": {
+        "title": "Update credentials",
+        "data": {
+          "app_id": "App ID",
+          "app_key": "App Key"
+        }
+      },
+      "add_stop": {
+        "title": "Choose a transport mode",
+        "data": {
+          "mode": "Mode"
+        }
+      },
+      "add_stop_line": {
+        "title": "Choose a line",
+        "data": {
+          "line_code": "Line"
+        }
+      },
+      "add_stop_confirm": {
+        "title": "Choose a stop",
+        "data": {
+          "stop_code": "Stop"
+        }
+      },
+      "remove_stop": {
+        "title": "Remove stops",
+        "data": {
+          "stop_code": "Stops to remove"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid app_id/app_key.",
+      "cannot_connect": "Could not connect to the TMB API."
+    },
+    "abort": {
+      "no_stops_configured": "No stops are currently configured.",
+      "cannot_connect": "Could not connect to the TMB API."
+    }
+  }
+}

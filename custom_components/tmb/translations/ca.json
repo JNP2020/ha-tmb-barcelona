@@ -1,0 +1,99 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connecta amb TMB",
+        "description": "Introdueix l'app_id i l'app_key del teu compte de desenvolupador de TMB (https://developer.tmb.cat/).",
+        "data": {
+          "app_id": "App ID",
+          "app_key": "App Key"
+        }
+      },
+      "mode": {
+        "title": "Tria un mode de transport",
+        "data": {
+          "mode": "Mode"
+        }
+      },
+      "line": {
+        "title": "Tria una línia",
+        "data": {
+          "line_code": "Línia"
+        }
+      },
+      "stop": {
+        "title": "Tria una parada",
+        "data": {
+          "stop_code": "Parada"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Torna a autenticar TMB",
+        "description": "El teu app_id/app_key de TMB ja no és vàlid. Introdueix noves credencials.",
+        "data": {
+          "app_id": "App ID",
+          "app_key": "App Key"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "app_id/app_key no vàlids.",
+      "cannot_connect": "No s'ha pogut connectar amb l'API de TMB."
+    },
+    "abort": {
+      "already_configured": "TMB ja està configurat.",
+      "reauth_successful": "La reautenticació s'ha completat correctament."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Opcions de TMB",
+        "menu_options": {
+          "add_stop": "Afegeix una parada",
+          "remove_stop": "Elimina una parada",
+          "credentials": "Actualitza les credencials"
+        }
+      },
+      "credentials": {
+        "title": "Actualitza les credencials",
+        "data": {
+          "app_id": "App ID",
+          "app_key": "App Key"
+        }
+      },
+      "add_stop": {
+        "title": "Tria un mode de transport",
+        "data": {
+          "mode": "Mode"
+        }
+      },
+      "add_stop_line": {
+        "title": "Tria una línia",
+        "data": {
+          "line_code": "Línia"
+        }
+      },
+      "add_stop_confirm": {
+        "title": "Tria una parada",
+        "data": {
+          "stop_code": "Parada"
+        }
+      },
+      "remove_stop": {
+        "title": "Elimina parades",
+        "data": {
+          "stop_code": "Parades a eliminar"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "app_id/app_key no vàlids.",
+      "cannot_connect": "No s'ha pogut connectar amb l'API de TMB."
+    },
+    "abort": {
+      "no_stops_configured": "Actualment no hi ha cap parada configurada.",
+      "cannot_connect": "No s'ha pogut connectar amb l'API de TMB."
+    }
+  }
+}
