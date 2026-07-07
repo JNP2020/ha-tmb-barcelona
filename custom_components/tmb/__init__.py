@@ -167,11 +167,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
-    """Serve custom_components/tmb/www/ at FRONTEND_URL_BASE, once per run.
+    """Serve custom_components/tmb/www/ at FRONTEND_URL_BASE, once per run,
+    and auto-add tmb-timetable-card.js as a Lovelace resource.
 
-    This lets tmb-timetable-card.js be added to any dashboard as a Lovelace
-    resource without needing a separate HACS "plugin" repo — the
-    integration serves its own static file directly.
+    Serving the file isn't enough on its own — the browser only loads it if
+    a dashboard resource points at the URL, and the UI to add one
+    (Settings -> Dashboards -> Resources) is hidden unless the user's
+    profile has Advanced Mode on, an easy step to miss entirely. Auto-adding
+    it (storage-mode dashboards only; YAML-mode has no collection to write
+    to) means the card works without that manual step.
     """
     if hass.data.get(_FRONTEND_REGISTERED_KEY):
         return
@@ -194,3 +198,34 @@ async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
             exc_info=True,
         )
     hass.data[_FRONTEND_REGISTERED_KEY] = True
+
+    await _async_register_lovelace_resource(hass)
+
+
+async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
+    """Add tmb-timetable-card.js as a Lovelace resource if not already present.
+
+    Only possible for storage-mode dashboards (the default for UI-managed
+    dashboards), which expose a writable resource collection; YAML-mode
+    dashboards manage resources via the user's own ui-lovelace.yaml, which
+    this can't safely edit, so those users still add it manually (README).
+    """
+    resource_url = f"{FRONTEND_URL_BASE}/tmb-timetable-card.js"
+    try:
+        lovelace_data = hass.data.get("lovelace")
+        if lovelace_data is None or lovelace_data.resource_mode != "storage":
+            return
+        resources = lovelace_data.resources
+        await resources.async_get_info()  # ensures the collection is loaded
+        if any(item.get("url") == resource_url for item in resources.async_items() or []):
+            return
+        await resources.async_create_item({"res_type": "module", "url": resource_url})
+        _LOGGER.debug("Registered %s as a Lovelace resource", resource_url)
+    except Exception:  # noqa: BLE001 - never let this block sensor setup
+        _LOGGER.warning(
+            "Could not auto-register the tmb-timetable-card dashboard "
+            "resource; add %s manually instead (Settings -> Dashboards -> "
+            "Resources — see the README).",
+            resource_url,
+            exc_info=True,
+        )

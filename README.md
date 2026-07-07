@@ -85,9 +85,17 @@ as a live departure board (line badge in the line's own official color,
 destination, minutes), sorted soonest-first across bus and metro alike.
 
 The card is served directly by the integration — no separate HACS
-"plugin" install needed. Add it as a dashboard resource once:
+"plugin" install needed, and as of 1.5 it's added as a dashboard resource
+**automatically** (storage-mode dashboards, the default). If your
+dashboard shows "custom element doesn't exist: tmb-timetable-card" or a
+blank card, that auto-registration didn't run yet — reload the integration
+(Settings → Devices & Services → TMB → ⋮ → Reload) and hard-refresh the
+dashboard. If you're on a YAML-mode dashboard, or it still doesn't show up,
+add the resource by hand instead:
 
-1. Settings → Dashboards → ⋮ → Resources → Add resource.
+1. Settings → Dashboards → ⋮ → Resources → Add resource. (This menu is
+   hidden unless Advanced Mode is on — Settings → your profile → scroll
+   down → Advanced Mode.)
 2. URL: `/tmb_static/tmb-timetable-card.js`, type: JavaScript module.
 3. Add the card to a dashboard (via the card picker, or manually):
 

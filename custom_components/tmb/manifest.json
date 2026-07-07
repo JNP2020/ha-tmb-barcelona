@@ -3,10 +3,10 @@
   "name": "TMB Barcelona",
   "codeowners": ["@JNP2020"],
   "config_flow": true,
-  "dependencies": ["http"],
+  "dependencies": ["http", "lovelace"],
   "documentation": "https://github.com/JNP2020/ha-tmb-barcelona",
   "iot_class": "cloud_polling",
   "issue_tracker": "https://github.com/JNP2020/ha-tmb-barcelona/issues",
   "requirements": [],
-  "version": "1.4"
+  "version": "1.5"
 }
