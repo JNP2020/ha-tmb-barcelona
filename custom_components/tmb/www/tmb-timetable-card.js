@@ -381,7 +381,7 @@ class TmbTimetableCardEditor extends HTMLElement {
     // by Lovelace when creating an editor) or connectedCallback handle
     // the initial build instead.
     if (this._built) {
-      this._refreshStations();
+      this._refreshStationsIfChanged();
     }
   }
 
@@ -494,8 +494,27 @@ class TmbTimetableCardEditor extends HTMLElement {
     this._refreshStations();
   }
 
+  /**
+   * hass updates fire constantly on a live dashboard (any entity changing
+   * state, including our own sensors polling every ~30s) — rebuilding the
+   * stations section on every single one of those, unconditionally, was
+   * destroying and recreating the "add a station" <select> out from under
+   * the user, which closes a native dropdown the instant it's opened
+   * before a choice can be made. Only actually rebuild when the set of
+   * available or selected station names has changed.
+   */
+  _refreshStationsIfChanged() {
+    const key = JSON.stringify([this._availableStationNames(), this._config.stations]);
+    if (key === this._lastStationsKey) return;
+    this._refreshStations();
+  }
+
   _refreshStations() {
     if (!this._stationsSection) return;
+    this._lastStationsKey = JSON.stringify([
+      this._availableStationNames(),
+      this._config.stations,
+    ]);
     this._stationsSection.innerHTML = "";
 
     if (this._config.stations.length === 0) {
