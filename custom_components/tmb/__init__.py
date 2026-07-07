@@ -1,6 +1,9 @@
 """The TMB (Transports Metropolitans de Barcelona) integration."""
 from __future__ import annotations
 
+import logging
+from pathlib import Path
+
 import voluptuous as vol
 
 from homeassistant.config_entries import ConfigEntry
@@ -11,8 +14,10 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import TmbApiClient, TmbApiError
-from .const import CONF_APP_ID, CONF_APP_KEY, CONF_STOPS, DOMAIN
+from .const import CONF_APP_ID, CONF_APP_KEY, CONF_STOPS, DOMAIN, FRONTEND_URL_BASE
 from .coordinator import TmbCoordinator
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
 
@@ -34,6 +39,8 @@ PLAN_TRIP_SCHEMA = vol.Schema(
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up TMB from a config entry."""
+    await _async_register_frontend_resources(hass)
+
     client = TmbApiClient(
         async_get_clientsession(hass),
         entry.data[CONF_APP_ID],
@@ -88,3 +95,33 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if not hass.data[DOMAIN]:
             hass.services.async_remove(DOMAIN, SERVICE_PLAN_TRIP)
     return unload_ok
+
+
+async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
+    """Serve custom_components/tmb/www/ at FRONTEND_URL_BASE, once per run.
+
+    This lets tmb-timetable-card.js be added to any dashboard as a Lovelace
+    resource without needing a separate HACS "plugin" repo — the
+    integration serves its own static file directly.
+    """
+    if hass.data.get(DOMAIN, {}).get("_frontend_registered"):
+        return
+    www_dir = str(Path(__file__).parent / "www")
+    try:
+        try:
+            # Modern, non-deprecated API (HA 2024.7+).
+            from homeassistant.components.http import StaticPathConfig
+
+            await hass.http.async_register_static_paths(
+                [StaticPathConfig(FRONTEND_URL_BASE, www_dir, False)]
+            )
+        except ImportError:
+            hass.http.register_static_path(FRONTEND_URL_BASE, www_dir, False)
+    except Exception:  # noqa: BLE001 - never let a card-serving hiccup break setup
+        _LOGGER.warning(
+            "Could not register the tmb-timetable-card frontend resource; "
+            "the sensors will still work, but the Lovelace card won't be "
+            "available until this succeeds on a future reload.",
+            exc_info=True,
+        )
+    hass.data.setdefault(DOMAIN, {})["_frontend_registered"] = True

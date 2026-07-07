@@ -28,6 +28,7 @@ from .const import (
     CONF_APP_ID,
     CONF_APP_KEY,
     CONF_LINE_CODE,
+    CONF_LINE_COLOR,
     CONF_LINE_NAME,
     CONF_MODE,
     CONF_STOP_CODE,
@@ -118,6 +119,7 @@ class TmbConfigFlow(ConfigFlow, domain=DOMAIN):
         self._mode: str | None = None
         self._line_code: str | None = None
         self._line_name: str | None = None
+        self._line_color: str | None = None
         self._lines_cache: list[LineInfo] = []
         self._reauth_entry: ConfigEntry | None = None
 
@@ -164,10 +166,12 @@ class TmbConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             self._line_code = user_input[CONF_LINE_CODE]
-            self._line_name = next(
-                (line["name"] for line in self._lines_cache if line["code"] == self._line_code),
-                self._line_code,
+            selected_line = next(
+                (line for line in self._lines_cache if line["code"] == self._line_code),
+                None,
             )
+            self._line_name = selected_line["name"] if selected_line else self._line_code
+            self._line_color = selected_line["color"] if selected_line else None
             return await self.async_step_stop()
 
         return self.async_show_form(
@@ -188,6 +192,7 @@ class TmbConfigFlow(ConfigFlow, domain=DOMAIN):
                 CONF_MODE: self._mode,
                 CONF_LINE_CODE: self._line_code,
                 CONF_LINE_NAME: self._line_name,
+                CONF_LINE_COLOR: self._line_color,
                 CONF_STOP_CODE: stop_code,
                 CONF_STOP_NAME: stop_name,
             }
@@ -247,6 +252,7 @@ class TmbOptionsFlow(OptionsFlow):
         self._mode: str | None = None
         self._line_code: str | None = None
         self._line_name: str | None = None
+        self._line_color: str | None = None
 
     def _client(self) -> TmbApiClient:
         return TmbApiClient(
@@ -308,10 +314,11 @@ class TmbOptionsFlow(OptionsFlow):
 
         if user_input is not None:
             self._line_code = user_input[CONF_LINE_CODE]
-            self._line_name = next(
-                (line["name"] for line in lines if line["code"] == self._line_code),
-                self._line_code,
+            selected_line = next(
+                (line for line in lines if line["code"] == self._line_code), None
             )
+            self._line_name = selected_line["name"] if selected_line else self._line_code
+            self._line_color = selected_line["color"] if selected_line else None
             return await self.async_step_add_stop_confirm()
 
         return self.async_show_form(step_id="add_stop_line", data_schema=_line_schema(lines))
@@ -330,6 +337,7 @@ class TmbOptionsFlow(OptionsFlow):
                 CONF_MODE: self._mode,
                 CONF_LINE_CODE: self._line_code,
                 CONF_LINE_NAME: self._line_name,
+                CONF_LINE_COLOR: self._line_color,
                 CONF_STOP_CODE: stop_code,
                 CONF_STOP_NAME: stop_name,
             }

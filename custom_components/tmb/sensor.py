@@ -12,12 +12,14 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import (
     ATTR_DESTINATION,
     ATTR_LINE,
+    ATTR_LINE_COLOR,
     ATTR_MODE,
     ATTR_NEXT_ARRIVAL,
     ATTR_STOP_CODE,
     ATTR_STOP_NAME,
     ATTR_UPCOMING,
     CONF_LINE_CODE,
+    CONF_LINE_COLOR,
     CONF_LINE_NAME,
     CONF_MODE,
     CONF_STOP_CODE,
@@ -63,6 +65,8 @@ class TmbArrivalSensor(CoordinatorEntity[TmbCoordinator], SensorEntity):
         self._mode = item[CONF_MODE]
         self._line_code = item[CONF_LINE_CODE]
         self._line_name = item[CONF_LINE_NAME]
+        # .get(): entries added before line color was tracked (pre-1.1) won't have this key.
+        self._line_color = item.get(CONF_LINE_COLOR)
         self._stop_code = item[CONF_STOP_CODE]
         self._stop_name = item[CONF_STOP_NAME]
 
@@ -92,6 +96,7 @@ class TmbArrivalSensor(CoordinatorEntity[TmbCoordinator], SensorEntity):
         attrs = {
             ATTR_MODE: self._mode,
             ATTR_LINE: self._line_name,
+            ATTR_LINE_COLOR: self._line_color,
             ATTR_STOP_NAME: self._stop_name,
             ATTR_STOP_CODE: self._stop_code,
         }

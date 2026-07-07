@@ -18,12 +18,16 @@ own API.
   to know raw stop/line codes ahead of time).
 - **Bus and metro** real-time arrivals, via TMB's `iBus` and `iTransit`
   real-time services.
-- **One sensor per destination** at a stop — a stop served by a single
-  line/direction gets one plain sensor; a stop where a line reverses
-  direction gets one sensor per destination, each showing minutes to the
-  next arrival plus the following arrivals as an attribute.
+- **One sensor per configured line/stop**, showing minutes to the next
+  arrival, its destination, and the following arrivals as an attribute.
 - **Add/remove stops** later via Configure → options, without re-adding the
   integration.
+- **`tmb-timetable-card`** — a live departure-board Lovelace card, styled
+  after TMB's own station displays, showing every configured line at a
+  station sorted by soonest arrival. Add one card per station; switch
+  which station it shows by changing the card's `station` field, so the
+  same card type covers every stop you've configured. See
+  [Timetable card](#timetable-card) below.
 - **`tmb.plan_trip` service** — point-to-point itinerary lookup (walk +
   transit legs, duration, transfers) between two coordinates via TMB's
   trip planner, for use in automations/scripts.
@@ -63,9 +67,32 @@ sensor. Add more stops afterwards via the integration's Configure menu.
 ## Entity attributes
 
 Each arrival sensor's state is minutes until the next arrival. Attributes
-include `mode`, `line`, `destination`, `stop_name`, `stop_code`,
-`next_arrival`, and `upcoming` (minutes for the following arrivals at that
-stop/line/destination).
+include `mode`, `line`, `line_color`, `destination`, `stop_name`,
+`stop_code`, `next_arrival`, and `upcoming` (destination + minutes for the
+following arrivals on that line/stop).
+
+## Timetable card
+
+`tmb-timetable-card` renders every configured line at one station as a
+live departure board (line badge in the line's own color, destination,
+minutes), sorted soonest-first across bus and metro alike.
+
+The card is served directly by the integration — no separate HACS
+"plugin" install needed. Add it as a dashboard resource once:
+
+1. Settings → Dashboards → ⋮ → Resources → Add resource.
+2. URL: `/tmb_static/tmb-timetable-card.js`, type: JavaScript module.
+3. Add the card to a dashboard (via the card picker, or manually):
+
+   ```yaml
+   type: custom:tmb-timetable-card
+   station: Passeig de Gràcia   # must match a sensor's stop_name attribute
+   rows: 6                       # optional, default 6
+   ```
+
+`station` must exactly match the `stop_name` attribute of the sensors you
+want shown (visible on the sensor's Attributes in Developer Tools → States).
+Add multiple cards, one per station, to cover every stop you've configured.
 
 ## License
 

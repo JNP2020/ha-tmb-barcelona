@@ -52,6 +52,7 @@ class MonitoredItem(TypedDict):
     stop_code: str
     line_code: str
     line_name: str
+    line_color: str | None
 
 
 def item_key(item: MonitoredItem) -> str:
