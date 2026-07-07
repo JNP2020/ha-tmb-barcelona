@@ -20,6 +20,7 @@ by https://developer.tmb.cat/):
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any, TypedDict
 
 import aiohttp
@@ -231,9 +232,17 @@ class TmbApiClient:
         return arrivals
 
     async def async_get_metro_arrivals(self, station_code: str) -> list[Arrival]:
+        """Fetch real-time metro arrivals for a station.
+
+        `temps_arribada` is an absolute epoch-millisecond timestamp (matching
+        the response's own `timestamp` field), not a relative countdown, so
+        it has to be converted to "seconds from now" against the current
+        wall-clock time.
+        """
         payload = await self._get(
             f"{API_BASE_URL}/itransit/metro/estacions", {"estacions": station_code}
         )
+        now_ms = time.time() * 1000
         arrivals: list[Arrival] = []
         for line in payload.get("linies") or []:
             line_code = line.get("codi_linia")
@@ -245,14 +254,14 @@ class TmbApiClient:
                 for path in station.get("linies_trajectes") or []:
                     destination = path.get("desti_trajecte") or "?"
                     for train in path.get("propers_trens") or []:
-                        eta_sec = train.get("temps_arribada")
-                        if not isinstance(eta_sec, (int, float)):
+                        arrival_ms = train.get("temps_arribada")
+                        if not isinstance(arrival_ms, (int, float)):
                             continue
                         arrivals.append(
                             Arrival(
                                 line_code=str(line_code),
                                 destination=str(destination),
-                                eta_sec=max(0, int(eta_sec)),
+                                eta_sec=max(0, int((arrival_ms - now_ms) / 1000)),
                             )
                         )
         arrivals.sort(key=lambda arrival: arrival["eta_sec"])
