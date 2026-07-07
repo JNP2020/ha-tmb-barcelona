@@ -23,10 +23,10 @@ own API.
 - **Add/remove stops** later via Configure → options, without re-adding the
   integration.
 - **`tmb-timetable-card`** — a live departure-board Lovelace card, styled
-  after TMB's own station displays, showing every configured line at a
-  station sorted by soonest arrival. Add one card per station; switch
-  which station it shows by changing the card's `station` field, so the
-  same card type covers every stop you've configured. See
+  after TMB's own station displays, showing every configured line sorted
+  by soonest arrival, each in its own line's official color. Combine
+  several stations into a single board (e.g. Urquinaona's L1 and L4
+  platforms), or make one card per stop — see
   [Timetable card](#timetable-card) below.
 - **`tmb.plan_trip` service** — point-to-point itinerary lookup (walk +
   transit legs, duration, transfers) between two coordinates via TMB's
@@ -69,13 +69,15 @@ sensor. Add more stops afterwards via the integration's Configure menu.
 Each arrival sensor's state is minutes until the next arrival. Attributes
 include `mode`, `line`, `line_color`, `destination`, `stop_name`,
 `stop_code`, `next_arrival`, and `upcoming` (destination + minutes for the
-following arrivals on that line/stop).
+following arrivals on that line/stop). Stops added before `line_color`
+existed (pre-1.1) get it backfilled automatically the next time the
+integration loads — no need to remove and re-add them.
 
 ## Timetable card
 
-`tmb-timetable-card` renders every configured line at one station as a
-live departure board (line badge in the line's own color, destination,
-minutes), sorted soonest-first across bus and metro alike.
+`tmb-timetable-card` renders every configured line at one or more stations
+as a live departure board (line badge in the line's own official color,
+destination, minutes), sorted soonest-first across bus and metro alike.
 
 The card is served directly by the integration — no separate HACS
 "plugin" install needed. Add it as a dashboard resource once:
@@ -86,13 +88,40 @@ The card is served directly by the integration — no separate HACS
 
    ```yaml
    type: custom:tmb-timetable-card
-   station: Passeig de Gràcia   # must match a sensor's stop_name attribute
-   rows: 6                       # optional, default 6
+   stations:
+     - Passeig de Gràcia   # must match a sensor's stop_name attribute
+   rows: 8                  # optional, default 8
    ```
 
-`station` must exactly match the `stop_name` attribute of the sensors you
-want shown (visible on the sensor's Attributes in Developer Tools → States).
-Add multiple cards, one per station, to cover every stop you've configured.
+   A single station also works with the shorter singular form:
+
+   ```yaml
+   type: custom:tmb-timetable-card
+   station: Diagonal
+   ```
+
+`stations`/`station` must exactly match the `stop_name` attribute of the
+sensors you want shown (visible on a sensor's Attributes in Developer
+Tools → States).
+
+### Combining stations on one board
+
+List more than one station to merge them into a single board — each row
+still shows its own line's color, so mixing lines/stations is safe:
+
+```yaml
+type: custom:tmb-timetable-card
+stations:
+  - Urquinaona   # matches both the L1 and L4 sensors at this station
+  - Diagonal
+```
+
+Some physical stations (e.g. Urquinaona, served by both L1 and L4) expose
+the same `stop_name` across their different lines' sensors — in that case
+a single name already pulls in every line, and the header shows it once
+rather than repeating it. If you list stations with genuinely different
+names, the header joins them (e.g. "Urquinaona, Diagonal") unless you set
+an explicit `title`.
 
 ## License
 

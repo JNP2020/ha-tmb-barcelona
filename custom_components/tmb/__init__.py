@@ -14,7 +14,17 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .api import TmbApiClient, TmbApiError
-from .const import CONF_APP_ID, CONF_APP_KEY, CONF_STOPS, DOMAIN, FRONTEND_URL_BASE
+from .const import (
+    CONF_APP_ID,
+    CONF_APP_KEY,
+    CONF_LINE_CODE,
+    CONF_LINE_COLOR,
+    CONF_MODE,
+    CONF_STOPS,
+    DOMAIN,
+    FRONTEND_URL_BASE,
+    MODE_BUS,
+)
 from .coordinator import TmbCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,7 +56,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.data[CONF_APP_ID],
         entry.data[CONF_APP_KEY],
     )
-    coordinator = TmbCoordinator(hass, client, entry.options.get(CONF_STOPS, []))
+
+    items = entry.options.get(CONF_STOPS, [])
+    items, colors_changed = await _async_backfill_line_colors(client, items)
+    if colors_changed:
+        hass.config_entries.async_update_entry(
+            entry, options={**entry.options, CONF_STOPS: items}
+        )
+
+    coordinator = TmbCoordinator(hass, client, items)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
@@ -80,6 +98,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
+
+
+async def _async_backfill_line_colors(
+    client: TmbApiClient, items: list[dict]
+) -> tuple[list[dict], bool]:
+    """Fill in `line_color` for items configured before it was tracked (pre-1.1).
+
+    Their stored options predate the line_color field entirely, so without
+    this they'd be stuck showing a generic grey pill in the timetable card
+    forever instead of the line's real brand color, with no way to fix it
+    short of removing and re-adding the stop.
+    """
+    if all(item.get(CONF_LINE_COLOR) for item in items):
+        return items, False
+
+    colors_by_mode: dict[str, dict[str, str | None]] = {}
+
+    async def _color_for(mode: str, line_code: str) -> str | None:
+        if mode not in colors_by_mode:
+            lines = (
+                await client.async_get_bus_lines()
+                if mode == MODE_BUS
+                else await client.async_get_metro_lines()
+            )
+            colors_by_mode[mode] = {line["code"]: line["color"] for line in lines}
+        return colors_by_mode[mode].get(line_code)
+
+    changed = False
+    patched = []
+    for item in items:
+        if item.get(CONF_LINE_COLOR):
+            patched.append(item)
+            continue
+        try:
+            color = await _color_for(item[CONF_MODE], item[CONF_LINE_CODE])
+        except TmbApiError:
+            patched.append(item)
+            continue
+        patched.append({**item, CONF_LINE_COLOR: color})
+        changed = True
+    return patched, changed
 
 
 async def _async_update_listener(hass: HomeAssistant, entry: ConfigEntry) -> None:

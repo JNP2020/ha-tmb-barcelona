@@ -1,18 +1,28 @@
 /**
  * tmb-timetable-card
  *
- * A live departure board for one TMB (bus or metro) station, built from
- * this integration's per-line sensors (entities carrying a `stop_name`
- * attribute matching the configured station). No dependencies — a plain
- * custom element. Add one card per station; switch stations by changing
- * the `station` value, so the same card type covers every stop you've
- * configured.
+ * A live departure board for one or more TMB (bus or metro) stations,
+ * built from this integration's per-line sensors (entities carrying a
+ * `stop_name` attribute matching a configured station name). No
+ * dependencies — a plain custom element.
+ *
+ * Multiple stations can be combined into a single board — useful when a
+ * physical station has separate per-line codes that nonetheless share the
+ * same name (e.g. Urquinaona is served by both L1 and L4, and both
+ * sensors report `stop_name: "Urquinaona"`), or when you deliberately want
+ * to merge two differently-named stops into one board. Either way, each
+ * row keeps its own line's color; the header title is deduplicated so a
+ * shared name like "Urquinaona" is only shown once even though it matched
+ * sensors from two different lines.
  *
  * Card config:
  *   type: custom:tmb-timetable-card
- *   station: Passeig de Gràcia   # must match a sensor's stop_name attribute
- *   title: My Station             # optional, defaults to the station name
- *   rows: 6                       # optional, default 6
+ *   stations:                     # one or more; must match sensors' stop_name attribute
+ *     - Urquinaona
+ *     - Diagonal
+ *   station: Passeig de Gràcia    # back-compat single-station form; ignored if `stations` is set
+ *   title: My Station              # optional, defaults to the matched station name(s)
+ *   rows: 8                        # optional, default 8
  */
 
 const BG = "#1a1a1a";
@@ -31,23 +41,34 @@ function _textColorFor(hexColor) {
   return luminance > 0.6 ? "#000000" : "#ffffff";
 }
 
+function _stationNamesFrom(config) {
+  if (Array.isArray(config.stations)) {
+    return config.stations.filter((name) => !!name);
+  }
+  if (config.station) {
+    return [config.station];
+  }
+  return [];
+}
+
 class TmbTimetableCard extends HTMLElement {
   setConfig(config) {
-    if (!config || !config.station) {
+    const stationNames = _stationNamesFrom(config || {});
+    if (!config || stationNames.length === 0) {
       throw new Error(
-        "tmb-timetable-card: you must set 'station' (a sensor's stop_name attribute) in the card config."
+        "tmb-timetable-card: you must set 'stations' (a list) or 'station' (a single name) matching a sensor's stop_name attribute."
       );
     }
-    this._config = { rows: 6, ...config };
+    this._config = { rows: 8, ...config, stations: stationNames };
     this._built = false;
   }
 
   getCardSize() {
-    return 1 + (this._config ? this._config.rows : 6);
+    return 1 + (this._config ? this._config.rows : 8);
   }
 
   static getStubConfig() {
-    return { station: "", rows: 6 };
+    return { stations: [], rows: 8 };
   }
 
   connectedCallback() {
@@ -175,9 +196,17 @@ class TmbTimetableCard extends HTMLElement {
     this.appendChild(card);
 
     this._clockEl = wrapper.querySelector(".tmb-clock");
+    this._titleEl = wrapper.querySelector(".tmb-station-name");
     this._rowsEl = wrapper.querySelector(".tmb-rows");
-    wrapper.querySelector(".tmb-station-name").textContent =
-      this._config.title || this._config.station;
+
+    if (this._config.title) {
+      this._titleEl.textContent = this._config.title;
+    } else {
+      // No explicit title: fall back to the configured station name(s)
+      // immediately, refined to the actually-matched name(s) once hass
+      // data is available (see _updateTitle).
+      this._titleEl.textContent = this._config.stations.join(", ");
+    }
 
     this._tick();
   }
@@ -192,6 +221,20 @@ class TmbTimetableCard extends HTMLElement {
   }
 
   /**
+   * When no explicit title is set, the header shows the distinct set of
+   * station names actually matched by sensors — deduplicated, so two
+   * configured stations sharing a real-world name (e.g. Urquinaona L1 and
+   * L4 both reporting stop_name "Urquinaona") collapse to one label
+   * instead of repeating it.
+   */
+  _updateTitle(matchedNames) {
+    if (this._config.title || !this._titleEl) return;
+    const unique = [...new Set(matchedNames)];
+    this._titleEl.textContent =
+      unique.length > 0 ? unique.join(", ") : this._config.stations.join(", ");
+  }
+
+  /**
    * Unlike an absolute-timestamp schedule, this integration's sensors
    * already report "minutes from now" as of their last poll (~30s), so
    * there's nothing to interpolate client-side — just read the current
@@ -199,14 +242,15 @@ class TmbTimetableCard extends HTMLElement {
    */
   _collectRows() {
     if (!this._hass) return [];
-    const station = this._config.station;
+    const wanted = this._config.stations;
     const entities = Object.values(this._hass.states).filter(
       (e) =>
         e.entity_id.startsWith("sensor.") &&
         e.attributes &&
-        e.attributes.stop_name === station
+        wanted.includes(e.attributes.stop_name)
     );
     this._noEntitiesFound = entities.length === 0;
+    this._updateTitle(entities.map((e) => e.attributes.stop_name));
 
     const rows = [];
     for (const entity of entities) {
@@ -249,7 +293,9 @@ class TmbTimetableCard extends HTMLElement {
       const empty = document.createElement("div");
       empty.className = "tmb-empty";
       empty.textContent = this._noEntitiesFound
-        ? `No TMB sensors found for station "${this._config.station}" — check the name matches exactly (see a sensor's stop_name attribute).`
+        ? `No TMB sensors found for station(s) "${this._config.stations.join(
+            ", "
+          )}" — check the name(s) match exactly (see a sensor's stop_name attribute).`
         : "No arrivals forecast right now";
       this._rowsEl.appendChild(empty);
       return;
@@ -292,5 +338,5 @@ window.customCards = window.customCards || [];
 window.customCards.push({
   type: "tmb-timetable-card",
   name: "TMB Timetable",
-  description: "Live bus/metro departure board for one TMB station.",
+  description: "Live bus/metro departure board for one or more TMB stations.",
 });
