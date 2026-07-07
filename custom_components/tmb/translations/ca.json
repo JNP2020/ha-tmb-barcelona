@@ -90,8 +90,13 @@
       "settings": {
         "title": "Configuració",
         "data": {
-          "scan_interval": "Interval de consulta (segons)"
-        }
+          "scan_interval": "Interval de consulta (segons)",
+          "quiet_hours_enabled": "Activa les hores de silenci (no consultis l'API en una franja diària fixa)",
+          "quiet_hours_start": "Inici de les hores de silenci",
+          "quiet_hours_end": "Fi de les hores de silenci",
+          "auto_skip_no_service": "No consultis una línia quan l'horari publicat d'avui indiqui que no hi ha servei ara mateix"
+        },
+        "description": "Interval de consulta, hores de silenci i consulta automàtica segons l'horari."
       }
     },
     "error": {

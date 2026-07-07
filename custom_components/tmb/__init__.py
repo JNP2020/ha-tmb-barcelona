@@ -18,17 +18,24 @@ from .api import TmbApiClient, TmbApiError
 from .const import (
     CONF_APP_ID,
     CONF_APP_KEY,
+    CONF_AUTO_SKIP_NO_SERVICE,
     CONF_LINE_CODE,
     CONF_LINE_COLOR,
     CONF_MODE,
+    CONF_QUIET_HOURS_ENABLED,
+    CONF_QUIET_HOURS_END,
+    CONF_QUIET_HOURS_START,
     CONF_SCAN_INTERVAL,
     CONF_STOPS,
+    DEFAULT_QUIET_HOURS_END,
+    DEFAULT_QUIET_HOURS_START,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     FRONTEND_URL_BASE,
     MODE_BUS,
 )
 from .coordinator import TmbCoordinator
+from .gtfs import GtfsScheduleCache
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,7 +81,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     scan_interval = timedelta(
         seconds=entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS)
     )
-    coordinator = TmbCoordinator(hass, client, items, scan_interval)
+
+    quiet_hours = None
+    if entry.options.get(CONF_QUIET_HOURS_ENABLED, False):
+        quiet_hours = (
+            entry.options.get(CONF_QUIET_HOURS_START, DEFAULT_QUIET_HOURS_START),
+            entry.options.get(CONF_QUIET_HOURS_END, DEFAULT_QUIET_HOURS_END),
+        )
+
+    gtfs_cache = None
+    if entry.options.get(CONF_AUTO_SKIP_NO_SERVICE, False):
+        gtfs_cache = GtfsScheduleCache(hass, async_get_clientsession(hass))
+
+    coordinator = TmbCoordinator(
+        hass, client, items, scan_interval, quiet_hours, gtfs_cache
+    )
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {

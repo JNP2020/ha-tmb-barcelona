@@ -53,13 +53,15 @@ function _stationNamesFrom(config) {
 
 class TmbTimetableCard extends HTMLElement {
   setConfig(config) {
-    const stationNames = _stationNamesFrom(config || {});
-    if (!config || stationNames.length === 0) {
-      throw new Error(
-        "tmb-timetable-card: you must set 'stations' (a list) or 'station' (a single name) matching a sensor's stop_name attribute."
-      );
+    if (!config) {
+      throw new Error("tmb-timetable-card: invalid configuration.");
     }
-    this._config = { rows: 8, ...config, stations: stationNames };
+    // An empty `stations` list is valid (not an error) so that adding the
+    // card fresh from the card picker — which seeds it from
+    // getStubConfig()'s empty list — doesn't throw before the visual
+    // editor has had a chance to let the user add any; _renderRows()
+    // shows a "no stations configured" placeholder for it instead.
+    this._config = { rows: 8, ...config, stations: _stationNamesFrom(config) };
     this._built = false;
   }
 
@@ -205,7 +207,7 @@ class TmbTimetableCard extends HTMLElement {
       // No explicit title: fall back to the configured station name(s)
       // immediately, refined to the actually-matched name(s) once hass
       // data is available (see _updateTitle).
-      this._titleEl.textContent = this._config.stations.join(", ");
+      this._titleEl.textContent = this._config.stations.join(", ") || "TMB Timetable";
     }
 
     this._tick();
@@ -231,7 +233,9 @@ class TmbTimetableCard extends HTMLElement {
     if (this._config.title || !this._titleEl) return;
     const unique = [...new Set(matchedNames)];
     this._titleEl.textContent =
-      unique.length > 0 ? unique.join(", ") : this._config.stations.join(", ");
+      unique.length > 0
+        ? unique.join(", ")
+        : this._config.stations.join(", ") || "TMB Timetable";
   }
 
   /**
@@ -292,11 +296,15 @@ class TmbTimetableCard extends HTMLElement {
     if (rows.length === 0) {
       const empty = document.createElement("div");
       empty.className = "tmb-empty";
-      empty.textContent = this._noEntitiesFound
-        ? `No TMB sensors found for station(s) "${this._config.stations.join(
-            ", "
-          )}" — check the name(s) match exactly (see a sensor's stop_name attribute).`
-        : "No arrivals forecast right now";
+      if (this._config.stations.length === 0) {
+        empty.textContent = "No stations configured yet — edit this card to add one.";
+      } else if (this._noEntitiesFound) {
+        empty.textContent = `No TMB sensors found for station(s) "${this._config.stations.join(
+          ", "
+        )}" — check the name(s) match exactly (see a sensor's stop_name attribute).`;
+      } else {
+        empty.textContent = "No arrivals forecast right now";
+      }
       this._rowsEl.appendChild(empty);
       return;
     }
@@ -332,7 +340,220 @@ class TmbTimetableCard extends HTMLElement {
   }
 }
 
+TmbTimetableCard.getConfigElement = function () {
+  return document.createElement("tmb-timetable-card-editor");
+};
+
 customElements.define("tmb-timetable-card", TmbTimetableCard);
+
+/**
+ * Visual editor for tmb-timetable-card. A plain custom element (same
+ * dependency-free approach as the card itself) implementing Lovelace's
+ * editor contract: setConfig()/hass setter in, a "config-changed" custom
+ * event out.
+ *
+ * Stations are chosen from a dropdown populated from whatever sensors are
+ * actually present (matched by the same `stop_name` + `line` attribute
+ * signature the card itself uses) rather than typed by hand, since a typo
+ * in a hand-written station name fails silently (the card just shows "no
+ * sensors found").
+ */
+class TmbTimetableCardEditor extends HTMLElement {
+  setConfig(config) {
+    this._config = {
+      rows: 8,
+      ...config,
+      stations: _stationNamesFrom(config || {}),
+    };
+    if (this._built) {
+      this._refreshStations();
+      this._titleInput.value = this._config.title || "";
+      this._rowsInput.value = this._config.rows;
+    } else {
+      this._build();
+    }
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    // Only refresh here, never build: hass can arrive before setConfig
+    // does, and _build() requires this._config. setConfig (always called
+    // by Lovelace when creating an editor) or connectedCallback handle
+    // the initial build instead.
+    if (this._built) {
+      this._refreshStations();
+    }
+  }
+
+  connectedCallback() {
+    if (!this._built && this._config) {
+      this._build();
+    }
+  }
+
+  _availableStationNames() {
+    if (!this._hass) return [];
+    const names = new Set();
+    for (const entity of Object.values(this._hass.states)) {
+      const a = entity.attributes;
+      if (a && typeof a.stop_name === "string" && "line" in a) {
+        names.add(a.stop_name);
+      }
+    }
+    return [...names].sort((a, b) => a.localeCompare(b));
+  }
+
+  _emitConfigChanged() {
+    this.dispatchEvent(
+      new CustomEvent("config-changed", {
+        detail: { config: this._config },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  _addStation(name) {
+    if (!name || this._config.stations.includes(name)) return;
+    this._config = { ...this._config, stations: [...this._config.stations, name] };
+    this._emitConfigChanged();
+    this._refreshStations();
+  }
+
+  _removeStation(name) {
+    this._config = {
+      ...this._config,
+      stations: this._config.stations.filter((s) => s !== name),
+    };
+    this._emitConfigChanged();
+    this._refreshStations();
+  }
+
+  /**
+   * Builds the static form once: the stations section (rebuilt on demand
+   * by _refreshStations, which doesn't touch title/rows) plus the title
+   * and rows inputs, created exactly once and never replaced afterward.
+   * hass updates fire often on a live dashboard (any entity changing
+   * state, including our own sensors polling every ~30s) — rebuilding
+   * text inputs on every one of those would steal focus/cursor position
+   * out from under a user mid-keystroke, so only the parts that can't be
+   * mid-edit (the chips list, the add-station dropdown) get refreshed.
+   */
+  _build() {
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = "display: flex; flex-direction: column; gap: 16px; padding: 12px 0;";
+
+    const stationsLabel = document.createElement("div");
+    stationsLabel.textContent = "Stations";
+    stationsLabel.style.cssText = "font-weight: 500;";
+    wrapper.appendChild(stationsLabel);
+
+    const stationsSection = document.createElement("div");
+    stationsSection.style.cssText = "display: flex; flex-direction: column; gap: 8px;";
+    wrapper.appendChild(stationsSection);
+
+    const titleLabel = document.createElement("label");
+    titleLabel.textContent = "Title (optional — defaults to the station name)";
+    titleLabel.style.cssText = "font-weight: 500; display: flex; flex-direction: column; gap: 4px;";
+    const titleInput = document.createElement("input");
+    titleInput.type = "text";
+    titleInput.value = this._config.title || "";
+    titleInput.style.cssText = "padding: 6px; border-radius: 4px;";
+    titleInput.addEventListener("input", () => {
+      this._config = { ...this._config, title: titleInput.value || undefined };
+      this._emitConfigChanged();
+    });
+    titleLabel.appendChild(titleInput);
+    wrapper.appendChild(titleLabel);
+
+    const rowsLabel = document.createElement("label");
+    rowsLabel.textContent = "Rows";
+    rowsLabel.style.cssText = "font-weight: 500; display: flex; flex-direction: column; gap: 4px;";
+    const rowsInput = document.createElement("input");
+    rowsInput.type = "number";
+    rowsInput.min = "1";
+    rowsInput.max = "30";
+    rowsInput.value = this._config.rows;
+    rowsInput.style.cssText = "padding: 6px; border-radius: 4px; max-width: 100px;";
+    rowsInput.addEventListener("input", () => {
+      const parsed = parseInt(rowsInput.value, 10);
+      this._config = { ...this._config, rows: Number.isFinite(parsed) ? parsed : 8 };
+      this._emitConfigChanged();
+    });
+    rowsLabel.appendChild(rowsInput);
+    wrapper.appendChild(rowsLabel);
+
+    this._stationsSection = stationsSection;
+    this._titleInput = titleInput;
+    this._rowsInput = rowsInput;
+
+    this.innerHTML = "";
+    this.appendChild(wrapper);
+    this._built = true;
+
+    this._refreshStations();
+  }
+
+  _refreshStations() {
+    if (!this._stationsSection) return;
+    this._stationsSection.innerHTML = "";
+
+    if (this._config.stations.length === 0) {
+      const hint = document.createElement("div");
+      hint.textContent = "No stations added yet.";
+      hint.style.cssText = "opacity: 0.6; font-size: 0.9em;";
+      this._stationsSection.appendChild(hint);
+    }
+
+    for (const name of this._config.stations) {
+      const chip = document.createElement("div");
+      chip.style.cssText =
+        "display: flex; align-items: center; justify-content: space-between; " +
+        "padding: 6px 10px; border-radius: 6px; background: rgba(127,127,127,0.15);";
+
+      const label = document.createElement("span");
+      label.textContent = name;
+      chip.appendChild(label);
+
+      const removeBtn = document.createElement("button");
+      removeBtn.textContent = "✕";
+      removeBtn.type = "button";
+      removeBtn.style.cssText =
+        "border: none; background: none; cursor: pointer; font-size: 1em; opacity: 0.7;";
+      removeBtn.addEventListener("click", () => this._removeStation(name));
+      chip.appendChild(removeBtn);
+
+      this._stationsSection.appendChild(chip);
+    }
+
+    const available = this._availableStationNames().filter(
+      (name) => !this._config.stations.includes(name)
+    );
+
+    const addSelect = document.createElement("select");
+    addSelect.style.cssText = "padding: 6px; border-radius: 4px;";
+    const placeholderOption = document.createElement("option");
+    placeholderOption.value = "";
+    placeholderOption.textContent = available.length
+      ? "Add a station..."
+      : this._hass
+        ? "No more known stations"
+        : "Loading known stations...";
+    addSelect.appendChild(placeholderOption);
+    for (const name of available) {
+      const option = document.createElement("option");
+      option.value = name;
+      option.textContent = name;
+      addSelect.appendChild(option);
+    }
+    addSelect.addEventListener("change", () => {
+      this._addStation(addSelect.value);
+    });
+    this._stationsSection.appendChild(addSelect);
+  }
+}
+
+customElements.define("tmb-timetable-card-editor", TmbTimetableCardEditor);
 
 window.customCards = window.customCards || [];
 window.customCards.push({

@@ -15,6 +15,7 @@ from .const import (
     ATTR_LINE_COLOR,
     ATTR_MODE,
     ATTR_NEXT_ARRIVAL,
+    ATTR_SERVICE_STATUS,
     ATTR_STOP_CODE,
     ATTR_STOP_NAME,
     ATTR_UPCOMING,
@@ -27,6 +28,7 @@ from .const import (
     DOMAIN,
     MANUFACTURER,
     MODE_BUS,
+    SERVICE_STATUS_OK,
 )
 from .coordinator import TmbCoordinator, item_key
 
@@ -97,6 +99,9 @@ class TmbArrivalSensor(CoordinatorEntity[TmbCoordinator], SensorEntity):
             ATTR_LINE_COLOR: self._line_color,
             ATTR_STOP_NAME: self._stop_name,
             ATTR_STOP_CODE: self._stop_code,
+            ATTR_SERVICE_STATUS: self.coordinator.skip_reasons.get(
+                self._item_key, SERVICE_STATUS_OK
+            ),
         }
         upcoming = self._upcoming
         if not upcoming:

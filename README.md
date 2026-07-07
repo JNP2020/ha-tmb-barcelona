@@ -25,13 +25,19 @@ own API.
   integration.
 - **Configurable poll interval** — Configure → Settings, 15–300 seconds
   (default 30), if you want to trade responsiveness for fewer API calls.
+- **Quiet hours and schedule-aware auto-skip** — Configure → Settings:
+  skip all API calls during a fixed daily window (e.g. overnight), and/or
+  automatically skip polling a line when TMB's own published timetable
+  shows it has no service running right now. See
+  [Reducing API calls](#reducing-api-calls) below.
 - **Diagnostics** — Settings → Devices & Services → TMB → ⋮ → Download
   diagnostics, for bug reports (the `app_key` is redacted).
 - **`tmb-timetable-card`** — a live departure-board Lovelace card, styled
   after TMB's own station displays, showing every configured line sorted
-  by soonest arrival, each in its own line's official color. Combine
-  several stations into a single board (e.g. Urquinaona's L1 and L4
-  platforms), or make one card per stop — see
+  by soonest arrival, each in its own line's official color, with a
+  visual editor (Edit card → pick stations from a dropdown, no YAML
+  needed). Combine several stations into a single board (e.g.
+  Urquinaona's L1 and L4 platforms), or make one card per stop — see
   [Timetable card](#timetable-card) below.
 - **`tmb.plan_trip` service** — point-to-point itinerary lookup (walk +
   transit legs, duration, transfers) between two coordinates via TMB's
@@ -73,16 +79,44 @@ sensor. Add more stops afterwards via the integration's Configure menu.
 
 Each arrival sensor's state is minutes until the next arrival. Attributes
 include `mode`, `line`, `line_color`, `destination`, `stop_name`,
-`stop_code`, `next_arrival`, and `upcoming` (destination + minutes for the
-following arrivals on that line/stop). Stops added before `line_color`
-existed (pre-1.1) get it backfilled automatically the next time the
-integration loads — no need to remove and re-add them.
+`stop_code`, `next_arrival`, `upcoming` (destination + minutes for the
+following arrivals on that line/stop), and `service_status` (`ok`,
+`quiet_hours`, or `no_service_scheduled` — see below). Stops added before
+`line_color` existed (pre-1.1) get it backfilled automatically the next
+time the integration loads — no need to remove and re-add them.
+
+## Reducing API calls
+
+Configure → Settings offers two independent, stackable ways to skip real
+API calls instead of just polling for an empty result:
+
+- **Quiet hours**: a fixed daily window (e.g. 00:00–05:00) during which
+  every configured line/stop is skipped entirely, no matter what.
+- **Auto-skip with no scheduled service**: downloads and reads TMB's own
+  published GTFS timetable (~8 MB, refreshed once per day, parsed in the
+  background) to work out each line's actual first/last scheduled time
+  today, and skips polling a line outside that window — e.g. a bus line
+  that only runs 06:30–22:43 won't be polled at 3am, without you having to
+  know or configure its hours yourself. This is computed per *line*, not
+  per exact stop (TMB's timetable data leaves a large fraction of exact
+  per-stop times blank for interpolation, so aggregating across the whole
+  line is more reliable), and is deliberately biased to run a little wider
+  than the line's true window rather than risk cutting it too close — it
+  can cost a few extra polls near the edges of service, never miss a real
+  arrival. If the schedule download/parse ever fails, it fails open
+  (polls normally) rather than silently assuming no service.
+
+When either one skips a sensor, its state goes to unknown rather than
+holding a stale arrival time — check its `service_status` attribute
+(`quiet_hours` or `no_service_scheduled`) to see why.
 
 ## Timetable card
 
 `tmb-timetable-card` renders every configured line at one or more stations
 as a live departure board (line badge in the line's own official color,
 destination, minutes), sorted soonest-first across bus and metro alike.
+Click Edit on the card to add/remove stations from a dropdown instead of
+hand-writing YAML.
 
 The card is served directly by the integration — no separate HACS
 "plugin" install needed, and as of 1.5 it's added as a dashboard resource

@@ -18,6 +18,7 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    BooleanSelector,
     NumberSelector,
     NumberSelectorConfig,
     NumberSelectorMode,
@@ -25,20 +26,27 @@ from homeassistant.helpers.selector import (
     SelectSelector,
     SelectSelectorConfig,
     SelectSelectorMode,
+    TimeSelector,
 )
 
 from .api import LineInfo, StopInfo, TmbApiClient, TmbApiError, TmbAuthError
 from .const import (
     CONF_APP_ID,
     CONF_APP_KEY,
+    CONF_AUTO_SKIP_NO_SERVICE,
     CONF_LINE_CODE,
     CONF_LINE_COLOR,
     CONF_LINE_NAME,
     CONF_MODE,
+    CONF_QUIET_HOURS_ENABLED,
+    CONF_QUIET_HOURS_END,
+    CONF_QUIET_HOURS_START,
     CONF_SCAN_INTERVAL,
     CONF_STOP_CODE,
     CONF_STOP_NAME,
     CONF_STOPS,
+    DEFAULT_QUIET_HOURS_END,
+    DEFAULT_QUIET_HOURS_START,
     DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     MAX_SCAN_INTERVAL_SECONDS,
@@ -318,12 +326,13 @@ class TmbOptionsFlow(OptionsFlow):
                 title="", data={**self.config_entry.options, **user_input}
             )
 
-        current = self.config_entry.options.get(
-            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
-        )
+        options = self.config_entry.options
         schema = vol.Schema(
             {
-                vol.Required(CONF_SCAN_INTERVAL, default=current): NumberSelector(
+                vol.Required(
+                    CONF_SCAN_INTERVAL,
+                    default=options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS),
+                ): NumberSelector(
                     NumberSelectorConfig(
                         min=MIN_SCAN_INTERVAL_SECONDS,
                         max=MAX_SCAN_INTERVAL_SECONDS,
@@ -331,7 +340,23 @@ class TmbOptionsFlow(OptionsFlow):
                         unit_of_measurement="s",
                         mode=NumberSelectorMode.BOX,
                     )
-                )
+                ),
+                vol.Required(
+                    CONF_QUIET_HOURS_ENABLED,
+                    default=options.get(CONF_QUIET_HOURS_ENABLED, False),
+                ): BooleanSelector(),
+                vol.Required(
+                    CONF_QUIET_HOURS_START,
+                    default=options.get(CONF_QUIET_HOURS_START, DEFAULT_QUIET_HOURS_START),
+                ): TimeSelector(),
+                vol.Required(
+                    CONF_QUIET_HOURS_END,
+                    default=options.get(CONF_QUIET_HOURS_END, DEFAULT_QUIET_HOURS_END),
+                ): TimeSelector(),
+                vol.Required(
+                    CONF_AUTO_SKIP_NO_SERVICE,
+                    default=options.get(CONF_AUTO_SKIP_NO_SERVICE, False),
+                ): BooleanSelector(),
             }
         )
         return self.async_show_form(step_id="settings", data_schema=schema)
