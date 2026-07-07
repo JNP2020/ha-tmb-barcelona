@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Conectar con TMB",
-        "description": "Introduce el app_id y la app_key de tu cuenta de desarrollador de TMB (https://developer.tmb.cat/).",
+        "description": "Introduce el app_id y la app_key de tu cuenta de desarrollador de TMB.",
         "data": {
           "app_id": "App ID",
           "app_key": "App Key"
@@ -52,6 +52,7 @@
         "menu_options": {
           "add_stop": "Añadir una parada",
           "remove_stop": "Eliminar una parada",
+          "settings": "Configuración",
           "credentials": "Actualizar credenciales"
         }
       },
@@ -84,6 +85,12 @@
         "title": "Eliminar paradas",
         "data": {
           "stop_code": "Paradas a eliminar"
+        }
+      },
+      "settings": {
+        "title": "Configuración",
+        "data": {
+          "scan_interval": "Intervalo de consulta (segundos)"
         }
       }
     },

@@ -14,14 +14,19 @@ own API.
 ## Features
 
 - **Config flow setup** — no YAML. Enter your TMB `app_id`/`app_key`, then
-  pick a transport mode, line, and stop from searchable dropdowns (no need
-  to know raw stop/line codes ahead of time).
+  pick a transport mode, line, and stop from searchable dropdowns — sorted
+  nearest-to-home first, with distances shown, so finding "the stop near
+  me" on a line with 50+ stops doesn't mean scrolling an alphabetical list.
 - **Bus and metro** real-time arrivals, via TMB's `iBus` and `iTransit`
   real-time services.
 - **One sensor per configured line/stop**, showing minutes to the next
   arrival, its destination, and the following arrivals as an attribute.
 - **Add/remove stops** later via Configure → options, without re-adding the
   integration.
+- **Configurable poll interval** — Configure → Settings, 15–300 seconds
+  (default 30), if you want to trade responsiveness for fewer API calls.
+- **Diagnostics** — Settings → Devices & Services → TMB → ⋮ → Download
+  diagnostics, for bug reports (the `app_key` is redacted).
 - **`tmb-timetable-card`** — a live departure-board Lovelace card, styled
   after TMB's own station displays, showing every configured line sorted
   by soonest arrival, each in its own line's official color. Combine

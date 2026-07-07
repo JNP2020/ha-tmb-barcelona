@@ -9,6 +9,7 @@ that line.
 """
 from __future__ import annotations
 
+from math import atan2, cos, radians, sin, sqrt
 from typing import Any
 
 import voluptuous as vol
@@ -17,6 +18,9 @@ from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import (
+    NumberSelector,
+    NumberSelectorConfig,
+    NumberSelectorMode,
     SelectOptionDict,
     SelectSelector,
     SelectSelectorConfig,
@@ -31,10 +35,14 @@ from .const import (
     CONF_LINE_COLOR,
     CONF_LINE_NAME,
     CONF_MODE,
+    CONF_SCAN_INTERVAL,
     CONF_STOP_CODE,
     CONF_STOP_NAME,
     CONF_STOPS,
+    DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
+    MAX_SCAN_INTERVAL_SECONDS,
+    MIN_SCAN_INTERVAL_SECONDS,
     MODE_BUS,
     MODE_METRO,
 )
@@ -70,11 +78,43 @@ def _line_schema(lines: list[LineInfo]) -> vol.Schema:
     )
 
 
-def _stop_schema(stops: list[StopInfo]) -> vol.Schema:
-    options = [
-        SelectOptionDict(value=stop["code"], label=f"{stop['name']} ({stop['code']})")
-        for stop in stops
-    ]
+def _distance_meters(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Great-circle distance between two points, in meters."""
+    radius = 6371000
+    phi1, phi2 = radians(lat1), radians(lat2)
+    dphi = radians(lat2 - lat1)
+    dlambda = radians(lon2 - lon1)
+    a = sin(dphi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(dlambda / 2) ** 2
+    return 2 * radius * atan2(sqrt(a), sqrt(1 - a))
+
+
+def _stop_schema(
+    stops: list[StopInfo], home: tuple[float, float] | None = None
+) -> vol.Schema:
+    """Build the stop-picker schema.
+
+    When home coordinates are available, stops are sorted nearest-first and
+    annotated with their distance — a line can easily have 50+ stops, and
+    scrolling an alphabetical list to find "the one near me" is tedious.
+    Stops missing coordinates (shouldn't normally happen, but the API is
+    external) sort last and skip the distance annotation.
+    """
+
+    def distance_for(stop: StopInfo) -> float:
+        if home is None or stop["lat"] is None or stop["lon"] is None:
+            return float("inf")
+        return _distance_meters(home[0], home[1], stop["lat"], stop["lon"])
+
+    ordered = sorted(stops, key=distance_for) if home else stops
+
+    options = []
+    for stop in ordered:
+        label = f"{stop['name']} ({stop['code']})"
+        distance = distance_for(stop)
+        if distance != float("inf"):
+            label += f" — {round(distance)} m"
+        options.append(SelectOptionDict(value=stop["code"], label=label))
+
     return vol.Schema(
         {
             vol.Required(CONF_STOP_CODE): SelectSelector(
@@ -202,7 +242,8 @@ class TmbConfigFlow(ConfigFlow, domain=DOMAIN):
                 options={CONF_STOPS: [item]},
             )
 
-        return self.async_show_form(step_id="stop", data_schema=_stop_schema(stops))
+        home = (self.hass.config.latitude, self.hass.config.longitude)
+        return self.async_show_form(step_id="stop", data_schema=_stop_schema(stops, home))
 
     async def async_step_reauth(self, entry_data: dict[str, Any]) -> dict[str, Any]:
         self._reauth_entry = self.hass.config_entries.async_get_entry(
@@ -266,8 +307,34 @@ class TmbOptionsFlow(OptionsFlow):
     ) -> dict[str, Any]:
         return self.async_show_menu(
             step_id="init",
-            menu_options=["add_stop", "remove_stop", "credentials"],
+            menu_options=["add_stop", "remove_stop", "settings", "credentials"],
         )
+
+    async def async_step_settings(
+        self, user_input: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
+        if user_input is not None:
+            return self.async_create_entry(
+                title="", data={**self.config_entry.options, **user_input}
+            )
+
+        current = self.config_entry.options.get(
+            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS
+        )
+        schema = vol.Schema(
+            {
+                vol.Required(CONF_SCAN_INTERVAL, default=current): NumberSelector(
+                    NumberSelectorConfig(
+                        min=MIN_SCAN_INTERVAL_SECONDS,
+                        max=MAX_SCAN_INTERVAL_SECONDS,
+                        step=5,
+                        unit_of_measurement="s",
+                        mode=NumberSelectorMode.BOX,
+                    )
+                )
+            }
+        )
+        return self.async_show_form(step_id="settings", data_schema=schema)
 
     async def async_step_credentials(
         self, user_input: dict[str, Any] | None = None
@@ -348,8 +415,9 @@ class TmbOptionsFlow(OptionsFlow):
                 title="", data={**self.config_entry.options, CONF_STOPS: current}
             )
 
+        home = (self.hass.config.latitude, self.hass.config.longitude)
         return self.async_show_form(
-            step_id="add_stop_confirm", data_schema=_stop_schema(stops)
+            step_id="add_stop_confirm", data_schema=_stop_schema(stops, home)
         )
 
     async def async_step_remove_stop(

@@ -19,15 +19,13 @@ by https://developer.tmb.cat/):
 """
 from __future__ import annotations
 
-import logging
 import time
+from datetime import datetime
 from typing import Any, TypedDict
 
 import aiohttp
 
 from .const import API_BASE_URL
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class TmbApiError(Exception):
@@ -67,26 +65,11 @@ class Itinerary(TypedDict):
     description: str
 
 
-def _normalize_line_code(value: str) -> str:
-    return value.strip().upper().removeprefix("L")
-
-
 def _as_str(props: dict[str, Any], keys: list[str]) -> str | None:
     for key in keys:
         value = props.get(key)
         if value is not None:
             return str(value)
-    return None
-
-
-def _as_float(props: dict[str, Any], keys: list[str]) -> float | None:
-    for key in keys:
-        value = props.get(key)
-        if value is not None:
-            try:
-                return float(value)
-            except (TypeError, ValueError):
-                return None
     return None
 
 
@@ -274,8 +257,6 @@ class TmbApiClient:
     async def async_get_itineraries(
         self, from_lat: float, from_lon: float, to_lat: float, to_lon: float
     ) -> list[Itinerary]:
-        from datetime import datetime
-
         now = datetime.now()
         payload = await self._get(
             f"{API_BASE_URL}/planner/plan",

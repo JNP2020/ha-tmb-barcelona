@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from pathlib import Path
 
 import voluptuous as vol
@@ -20,7 +21,9 @@ from .const import (
     CONF_LINE_CODE,
     CONF_LINE_COLOR,
     CONF_MODE,
+    CONF_SCAN_INTERVAL,
     CONF_STOPS,
+    DEFAULT_SCAN_INTERVAL_SECONDS,
     DOMAIN,
     FRONTEND_URL_BASE,
     MODE_BUS,
@@ -30,6 +33,10 @@ from .coordinator import TmbCoordinator
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
+
+# Deliberately not nested under hass.data[DOMAIN], which holds only
+# per-config-entry data (see async_unload_entry's "last entry" check).
+_FRONTEND_REGISTERED_KEY = f"{DOMAIN}_frontend_registered"
 
 SERVICE_PLAN_TRIP = "plan_trip"
 ATTR_FROM_LATITUDE = "from_latitude"
@@ -64,7 +71,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             entry, options={**entry.options, CONF_STOPS: items}
         )
 
-    coordinator = TmbCoordinator(hass, client, items)
+    scan_interval = timedelta(
+        seconds=entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL_SECONDS)
+    )
+    coordinator = TmbCoordinator(hass, client, items, scan_interval)
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
@@ -163,7 +173,7 @@ async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
     resource without needing a separate HACS "plugin" repo — the
     integration serves its own static file directly.
     """
-    if hass.data.get(DOMAIN, {}).get("_frontend_registered"):
+    if hass.data.get(_FRONTEND_REGISTERED_KEY):
         return
     www_dir = str(Path(__file__).parent / "www")
     try:
@@ -183,4 +193,4 @@ async def _async_register_frontend_resources(hass: HomeAssistant) -> None:
             "available until this succeeds on a future reload.",
             exc_info=True,
         )
-    hass.data.setdefault(DOMAIN, {})["_frontend_registered"] = True
+    hass.data[_FRONTEND_REGISTERED_KEY] = True

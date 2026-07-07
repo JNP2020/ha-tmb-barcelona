@@ -18,7 +18,6 @@ from .const import (
     ATTR_STOP_CODE,
     ATTR_STOP_NAME,
     ATTR_UPCOMING,
-    CONF_LINE_CODE,
     CONF_LINE_COLOR,
     CONF_LINE_NAME,
     CONF_MODE,
@@ -63,7 +62,6 @@ class TmbArrivalSensor(CoordinatorEntity[TmbCoordinator], SensorEntity):
         super().__init__(coordinator)
         self._item_key = item_key(item)
         self._mode = item[CONF_MODE]
-        self._line_code = item[CONF_LINE_CODE]
         self._line_name = item[CONF_LINE_NAME]
         # .get(): entries added before line color was tracked (pre-1.1) won't have this key.
         self._line_color = item.get(CONF_LINE_COLOR)

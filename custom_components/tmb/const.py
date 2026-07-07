@@ -1,5 +1,4 @@
 """Constants for the TMB (Transports Metropolitans de Barcelona) integration."""
-from datetime import timedelta
 
 DOMAIN = "tmb"
 
@@ -13,13 +12,18 @@ CONF_LINE_NAME = "line_name"
 CONF_LINE_COLOR = "line_color"
 CONF_STOP_CODE = "stop_code"
 CONF_STOP_NAME = "stop_name"
+CONF_SCAN_INTERVAL = "scan_interval"
 
 MODE_BUS = "bus"
 MODE_METRO = "metro"
 
 API_BASE_URL = "https://api.tmb.cat/v1"
 
-SCAN_INTERVAL = timedelta(seconds=30)
+# Stored in options as a plain int (seconds) since timedelta isn't
+# JSON-serializable; converted to a timedelta where the coordinator needs one.
+DEFAULT_SCAN_INTERVAL_SECONDS = 30
+MIN_SCAN_INTERVAL_SECONDS = 15
+MAX_SCAN_INTERVAL_SECONDS = 300
 
 ATTR_MODE = "mode"
 ATTR_LINE = "line"

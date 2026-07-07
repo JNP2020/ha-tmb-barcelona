@@ -3,7 +3,7 @@
     "step": {
       "user": {
         "title": "Connect to TMB",
-        "description": "Enter the app_id and app_key from your TMB developer account (https://developer.tmb.cat/).",
+        "description": "Enter the app_id and app_key from your TMB developer account.",
         "data": {
           "app_id": "App ID",
           "app_key": "App Key"
@@ -52,6 +52,7 @@
         "menu_options": {
           "add_stop": "Add a stop",
           "remove_stop": "Remove a stop",
+          "settings": "Settings",
           "credentials": "Update credentials"
         }
       },
@@ -84,6 +85,12 @@
         "title": "Remove stops",
         "data": {
           "stop_code": "Stops to remove"
+        }
+      },
+      "settings": {
+        "title": "Settings",
+        "data": {
+          "scan_interval": "Poll interval (seconds)"
         }
       }
     },

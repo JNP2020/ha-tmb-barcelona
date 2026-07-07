@@ -27,6 +27,7 @@ refresh.
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import TypedDict
 
 from homeassistant.core import HomeAssistant
@@ -41,7 +42,6 @@ from .const import (
     CONF_STOP_CODE,
     DOMAIN,
     MODE_BUS,
-    SCAN_INTERVAL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -64,9 +64,13 @@ class TmbCoordinator(DataUpdateCoordinator[dict[str, list[Arrival]]]):
     """Coordinator that keeps, per monitored item, a nearest-first arrival list."""
 
     def __init__(
-        self, hass: HomeAssistant, client: TmbApiClient, items: list[MonitoredItem]
+        self,
+        hass: HomeAssistant,
+        client: TmbApiClient,
+        items: list[MonitoredItem],
+        update_interval: timedelta,
     ) -> None:
-        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=SCAN_INTERVAL)
+        super().__init__(hass, _LOGGER, name=DOMAIN, update_interval=update_interval)
         self._client = client
         self.items = items
 
