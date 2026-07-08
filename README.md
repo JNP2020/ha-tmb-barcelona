@@ -95,15 +95,19 @@ API calls instead of just polling for an empty result:
 - **Auto-skip with no scheduled service**: downloads and reads TMB's own
   published GTFS timetable (~8 MB, refreshed once per day, parsed in the
   background) to work out each line's actual first/last scheduled time
-  today, and skips polling a line outside that window — e.g. a bus line
-  that only runs 06:30–22:43 won't be polled at 3am, without you having to
-  know or configure its hours yourself. This is computed per *line*, not
-  per exact stop (TMB's timetable data leaves a large fraction of exact
-  per-stop times blank for interpolation, so aggregating across the whole
-  line is more reliable), and is deliberately biased to run a little wider
-  than the line's true window rather than risk cutting it too close — it
-  can cost a few extra polls near the edges of service, never miss a real
-  arrival. If the schedule download/parse ever fails, it fails open
+  today, and skips polling a line outside that window (with a 5-minute
+  margin on each side) — e.g. a bus line that only runs 06:30–22:43 won't
+  be polled at 3am, and polling resumes automatically 5 minutes before its
+  first departure, without you having to know or configure its hours
+  yourself. This is computed per *line*, not per exact stop (TMB's
+  timetable data leaves a large fraction of exact per-stop times blank for
+  interpolation, so aggregating across the whole line is more reliable).
+  A line running past midnight (e.g. last metro around 00:40) stays
+  correctly recognized as running right after the calendar day rolls
+  over, by keeping yesterday's computed window alongside today's rather
+  than discarding it at midnight — otherwise the last ~30–40 minutes of
+  real overnight service would look like a dead zone the moment the date
+  changes. If the schedule download/parse ever fails, it fails open
   (polls normally) rather than silently assuming no service.
 
 When either one skips a sensor, its state goes to unknown rather than
