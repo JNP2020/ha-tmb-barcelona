@@ -38,16 +38,24 @@ from __future__ import annotations
 import asyncio
 import csv
 import io
+import logging
+import time
 import zipfile
 from dataclasses import dataclass
 from datetime import date, timedelta
 
 import aiohttp
-
 from homeassistant.core import HomeAssistant
 from homeassistant.util import dt as dt_util
 
-from .const import API_BASE_URL
+from .const import (
+    API_BASE_URL,
+    GTFS_MAX_BYTES,
+    GTFS_REQUEST_TIMEOUT_SECONDS,
+    GTFS_RETRY_BACKOFF_SECONDS,
+)
+
+_LOGGER = logging.getLogger(__name__)
 
 GTFS_URL = f"{API_BASE_URL}/static/datasets/gtfs.zip"
 
@@ -117,9 +125,9 @@ class EffectiveWindow:
             return True
         if self.today is not None and self.today.covers(now_sec):
             return True
-        if self.yesterday is not None and self.yesterday.covers(now_sec + _SECONDS_PER_DAY):
-            return True
-        return False
+        return self.yesterday is not None and self.yesterday.covers(
+            now_sec + _SECONDS_PER_DAY
+        )
 
 
 def _read_rows(zf: zipfile.ZipFile, name: str):
@@ -239,6 +247,8 @@ class GtfsScheduleCache:
         self._lock = asyncio.Lock()
         self._windows_by_date: dict[date, dict[str, ServiceWindow | None]] = {}
         self._known_lines: set[str] = set()
+        # monotonic time before which a failed refresh isn't retried.
+        self._retry_after: float = 0.0
 
     async def async_get_windows(self, line_names: set[str]) -> dict[str, EffectiveWindow]:
         """Return each requested line's effective (today+yesterday) window.
@@ -255,7 +265,13 @@ class GtfsScheduleCache:
             have_both_days = today in self._windows_by_date and yesterday in self._windows_by_date
             have_all_lines = have_both_days and self._known_lines <= self._windows_by_date[today].keys()
             if not have_all_lines:
-                await self._async_refresh(self._known_lines, today, yesterday)
+                if time.monotonic() < self._retry_after:
+                    raise GtfsError("GTFS refresh recently failed; backing off")
+                try:
+                    await self._async_refresh(self._known_lines, today, yesterday)
+                except GtfsError:
+                    self._retry_after = time.monotonic() + GTFS_RETRY_BACKOFF_SECONDS
+                    raise
             self._windows_by_date = {
                 day: windows for day, windows in self._windows_by_date.items() if day >= yesterday
             }
@@ -271,9 +287,21 @@ class GtfsScheduleCache:
 
     async def _async_refresh(self, line_names: set[str], today: date, yesterday: date) -> None:
         try:
-            async with self._session.get(GTFS_URL) as resp:
+            timeout = aiohttp.ClientTimeout(total=GTFS_REQUEST_TIMEOUT_SECONDS)
+            async with self._session.get(GTFS_URL, timeout=timeout) as resp:
                 resp.raise_for_status()
-                zip_bytes = await resp.read()
+                if (resp.content_length or 0) > GTFS_MAX_BYTES:
+                    raise GtfsError("GTFS feed is unexpectedly large; refusing")
+                chunks: list[bytes] = []
+                size = 0
+                async for chunk in resp.content.iter_chunked(1024 * 1024):
+                    size += len(chunk)
+                    if size > GTFS_MAX_BYTES:
+                        raise GtfsError("GTFS feed exceeded the size limit; aborting")
+                    chunks.append(chunk)
+                zip_bytes = b"".join(chunks)
+        except TimeoutError as err:
+            raise GtfsError("Timed out downloading the GTFS feed") from err
         except aiohttp.ClientError as err:
             raise GtfsError(f"Could not download the GTFS feed: {err}") from err
 

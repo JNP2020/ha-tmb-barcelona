@@ -94,9 +94,13 @@
           "quiet_hours_enabled": "Activa les hores de silenci (no consultis l'API en una franja diària fixa)",
           "quiet_hours_start": "Inici de les hores de silenci",
           "quiet_hours_end": "Fi de les hores de silenci",
-          "auto_skip_no_service": "No consultis una línia quan l'horari publicat d'avui indiqui que no hi ha servei ara mateix"
+          "auto_skip_no_service": "No consultis una línia quan l'horari publicat d'avui indiqui que no hi ha servei ara mateix",
+          "enable_alerts": "Mostra les alertes del metro"
         },
-        "description": "Interval de consulta, hores de silenci i consulta automàtica segons l'horari."
+        "description": "Interval de consulta, hores de silenci i consulta automàtica segons l'horari.",
+        "data_description": {
+          "enable_alerts": "Obté els avisos de servei del metro de TMB i mostra'ls als sensors de metro i en un sensor d'alertes propi"
+        }
       }
     },
     "error": {

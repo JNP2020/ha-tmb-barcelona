@@ -15,6 +15,7 @@ by https://developer.tmb.cat/):
   scoped by the `estacions` query param the way you'd expect — it returns
   every line's data, so one call per station code covers every line serving
   that station, same as iBus.
+- `alerts/metro/channels/WEB`: current metro service notices (see alerts.py).
 - `planner/plan`: point-to-point multimodal trip planning.
 """
 from __future__ import annotations
@@ -25,7 +26,8 @@ from typing import Any, TypedDict
 
 import aiohttp
 
-from .const import API_BASE_URL
+from .alerts import MetroAlert, parse_alerts
+from .const import API_BASE_URL, REQUEST_TIMEOUT_SECONDS
 
 
 class TmbApiError(Exception):
@@ -34,6 +36,25 @@ class TmbApiError(Exception):
 
 class TmbAuthError(TmbApiError):
     """The provided app_id/app_key was rejected."""
+
+
+class TmbRateLimitError(TmbApiError):
+    """HTTP 429: the app_id/app_key quota was exceeded."""
+
+    def __init__(self, message: str, retry_after: int | None = None) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def _parse_retry_after(value: str | None) -> int | None:
+    """Seconds from a ``Retry-After`` header (HTTP-date form is ignored)."""
+    if value is None:
+        return None
+    try:
+        seconds = int(value.strip())
+    except ValueError:
+        return None
+    return seconds if seconds > 0 else None
 
 
 class LineInfo(TypedDict):
@@ -84,9 +105,17 @@ class TmbApiClient:
     async def _get(self, url: str, params: dict[str, Any] | None = None) -> Any:
         request_params = {"app_id": self._app_id, "app_key": self._app_key, **(params or {})}
         try:
-            async with self._session.get(url, params=request_params) as resp:
+            timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT_SECONDS)
+            async with self._session.get(
+                url, params=request_params, timeout=timeout
+            ) as resp:
                 if resp.status in (401, 403):
                     raise TmbAuthError("Invalid TMB app_id/app_key")
+                if resp.status == 429:
+                    raise TmbRateLimitError(
+                        "TMB API rate limit exceeded",
+                        _parse_retry_after(resp.headers.get("Retry-After")),
+                    )
                 if resp.status != 200:
                     body = await resp.text()
                     raise TmbApiError(f"TMB API returned HTTP {resp.status}: {body[:200]}")
@@ -96,6 +125,8 @@ class TmbApiClient:
                     raise TmbApiError(
                         f"TMB API returned an unparsable response: {err}"
                     ) from err
+        except TimeoutError as err:
+            raise TmbApiError("Timed out communicating with TMB API") from err
         except aiohttp.ClientError as err:
             raise TmbApiError(f"Error communicating with TMB API: {err}") from err
 
@@ -249,6 +280,15 @@ class TmbApiClient:
                         )
         arrivals.sort(key=lambda arrival: arrival["eta_sec"])
         return arrivals
+
+    # ------------------------------------------------------------------
+    # Metro service alerts.
+    # ------------------------------------------------------------------
+
+    async def async_get_metro_alerts(self) -> list[MetroAlert]:
+        """Fetch the metro alerts currently in force (see alerts.py)."""
+        payload = await self._get(f"{API_BASE_URL}/alerts/metro/channels/WEB")
+        return parse_alerts(payload, int(time.time()))
 
     # ------------------------------------------------------------------
     # Trip planner.

@@ -43,12 +43,26 @@ own API.
   transit legs, duration, transfers) between two coordinates via TMB's
   trip planner, for use in automations/scripts.
 
-## Not included (yet)
+## Metro service alerts
 
-TMB's public API does not expose real-time vehicle GPS positions or
-structured service-alert/incident feeds the way FGC's open-data portal
-does, so there's no device tracker, live map, or alerts sensor here. If
-TMB adds these to their public API, they'd be natural follow-ups.
+TMB publishes current metro service notices at
+`/v1/alerts/metro/channels/WEB`, and the integration uses them (bus alerts
+are not available from the public API):
+
+- every **metro** arrival sensor gains `line_status` (`normal`, `notices`,
+  `disrupted`, `partial` or `stopped`) and an `alerts` list for its line
+  (network-wide alerts count for every line);
+- a diagnostic **TMB Metro alerts** sensor reports how many notices are in
+  force, with `affected_lines` and the full list in its attributes.
+
+Only alerts in force *right now* are shown (dated windows in the past or
+future are dropped; alerts without dates are kept and flagged
+`undated`). Alerts refresh every 5 minutes on their own coordinator, so a
+failure there never affects arrival sensors. Turn them off under
+Configure → Settings → *Show metro service alerts*.
+
+TMB's public API still has no real-time vehicle positions, so there is no
+device tracker or live map.
 
 ## Requirements
 
@@ -81,7 +95,8 @@ Each arrival sensor's state is minutes until the next arrival. Attributes
 include `mode`, `line`, `line_color`, `destination`, `stop_name`,
 `stop_code`, `next_arrival`, `upcoming` (destination + minutes for the
 following arrivals on that line/stop), and `service_status` (`ok`,
-`quiet_hours`, or `no_service_scheduled` — see below). Stops added before
+`quiet_hours`, or `no_service_scheduled` — see below), and, for metro,
+`line_status` / `alerts` (see above). Stops added before
 `line_color` existed (pre-1.1) get it backfilled automatically the next
 time the integration loads — no need to remove and re-add them.
 
@@ -173,6 +188,16 @@ a single name already pulls in every line, and the header shows it once
 rather than repeating it. If you list stations with genuinely different
 names, the header joins them (e.g. "Urquinaona, Diagonal") unless you set
 an explicit `title`.
+
+## Development
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Tests and lint:
+
+```bash
+pip install -r requirements_test.txt
+ruff check custom_components tests
+pytest
+```
 
 ## License
 

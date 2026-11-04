@@ -44,7 +44,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.util import dt as dt_util
 
-from .api import Arrival, TmbApiClient, TmbApiError, TmbAuthError
+from .api import Arrival, TmbApiClient, TmbApiError, TmbAuthError, TmbRateLimitError
 from .const import (
     CONF_LINE_CODE,
     CONF_LINE_NAME,
@@ -52,6 +52,7 @@ from .const import (
     CONF_STOP_CODE,
     DOMAIN,
     MODE_BUS,
+    RATE_LIMIT_MIN_INTERVAL_SECONDS,
     SERVICE_STATUS_NO_SERVICE,
     SERVICE_STATUS_OK,
     SERVICE_STATUS_QUIET_HOURS,
@@ -114,6 +115,22 @@ class TmbCoordinator(DataUpdateCoordinator[dict[str, list[Arrival]]]):
         # item_key -> one of the SERVICE_STATUS_* constants, populated every
         # tick; sensor.py surfaces this so a "no data" sensor can say *why*.
         self.skip_reasons: dict[str, str] = {}
+        self._base_interval = update_interval
+
+    def _apply_backoff(self, retry_after: int | None) -> None:
+        """Slow polling after an HTTP 429 instead of hammering the quota."""
+        seconds = max(
+            retry_after or 0,
+            RATE_LIMIT_MIN_INTERVAL_SECONDS,
+            int(self._base_interval.total_seconds()) * 2,
+        )
+        self.update_interval = timedelta(seconds=seconds)
+        _LOGGER.warning("TMB rate limit hit; polling every %ss until it clears", seconds)
+
+    def _clear_backoff(self) -> None:
+        if self.update_interval != self._base_interval:
+            self.update_interval = self._base_interval
+            _LOGGER.info("TMB API recovered; restored normal polling interval")
 
     async def _async_update_data(self) -> dict[str, list[Arrival]]:
         now_sec = _seconds_since_midnight(dt_util.now())
@@ -144,6 +161,9 @@ class TmbCoordinator(DataUpdateCoordinator[dict[str, list[Arrival]]]):
                     arrivals = await self._client.async_get_metro_arrivals(code)
             except TmbAuthError as err:
                 raise ConfigEntryAuthFailed("Invalid TMB app_id/app_key") from err
+            except TmbRateLimitError as err:
+                self._apply_backoff(err.retry_after)
+                raise UpdateFailed(f"TMB rate limit exceeded fetching {code}") from err
             except TmbApiError as err:
                 raise UpdateFailed(f"Error fetching TMB arrivals for {code}: {err}") from err
             stop_arrivals_cache[cache_key] = arrivals
@@ -180,4 +200,5 @@ class TmbCoordinator(DataUpdateCoordinator[dict[str, list[Arrival]]]):
             matching.sort(key=lambda arrival: arrival["eta_sec"])
             result[key] = matching
 
+        self._clear_backoff()
         return result

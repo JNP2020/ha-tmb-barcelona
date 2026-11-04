@@ -94,9 +94,13 @@
           "quiet_hours_enabled": "Activar horas de silencio (no consultar la API en una franja diaria fija)",
           "quiet_hours_start": "Inicio de las horas de silencio",
           "quiet_hours_end": "Fin de las horas de silencio",
-          "auto_skip_no_service": "No consultar una línea cuando el horario publicado de hoy indique que no hay servicio ahora mismo"
+          "auto_skip_no_service": "No consultar una línea cuando el horario publicado de hoy indique que no hay servicio ahora mismo",
+          "enable_alerts": "Mostrar alertas del metro"
         },
-        "description": "Intervalo de consulta, horas de silencio y consulta automática según el horario."
+        "description": "Intervalo de consulta, horas de silencio y consulta automática según el horario.",
+        "data_description": {
+          "enable_alerts": "Obtiene los avisos de servicio del metro de TMB y los muestra en los sensores de metro y en un sensor de alertas propio"
+        }
       }
     },
     "error": {

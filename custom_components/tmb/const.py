@@ -17,6 +17,7 @@ CONF_QUIET_HOURS_ENABLED = "quiet_hours_enabled"
 CONF_QUIET_HOURS_START = "quiet_hours_start"
 CONF_QUIET_HOURS_END = "quiet_hours_end"
 CONF_AUTO_SKIP_NO_SERVICE = "auto_skip_no_service"
+CONF_ENABLE_ALERTS = "enable_alerts"
 
 MODE_BUS = "bus"
 MODE_METRO = "metro"
@@ -43,12 +44,36 @@ ATTR_STOP_CODE = "stop_code"
 ATTR_NEXT_ARRIVAL = "next_arrival"
 ATTR_UPCOMING = "upcoming"
 ATTR_SERVICE_STATUS = "service_status"
+ATTR_ARRIVAL_TIME = "arrival_time"
+ATTR_ALERTS = "alerts"
+ATTR_LINE_ALERTS = "line_alerts"
+ATTR_LINE_STATUS = "line_status"
+ATTR_ALERT_COUNT = "alert_count"
 
 SERVICE_STATUS_OK = "ok"
 SERVICE_STATUS_QUIET_HOURS = "quiet_hours"
 SERVICE_STATUS_NO_SERVICE = "no_service_scheduled"
 
+# Metro service-alert feed (api.tmb.cat/v1/alerts/metro/...) changes slowly;
+# no point hammering it at the arrivals poll rate.
+ALERTS_SCAN_INTERVAL_SECONDS = 300
+
+# Outbound HTTP hardening: a stuck connection must never hang a coordinator.
+REQUEST_TIMEOUT_SECONDS = 15
+GTFS_REQUEST_TIMEOUT_SECONDS = 180
+# The real feed is a few tens of MB; anything far beyond that is not what we
+# expect and is refused rather than buffered into memory.
+GTFS_MAX_BYTES = 150 * 1024 * 1024
+# After a failed GTFS download/parse, wait this long before trying again
+# instead of re-downloading a large file on every coordinator tick.
+GTFS_RETRY_BACKOFF_SECONDS = 30 * 60
+
+# Back-off applied to the arrivals poll interval after an HTTP 429.
+RATE_LIMIT_MIN_INTERVAL_SECONDS = 120
+
 MANUFACTURER = "Transports Metropolitans de Barcelona"
+ATTRIBUTION = "Data provided by Transports Metropolitans de Barcelona"
+CARD_JS_FILENAME = "tmb-timetable-card.js"
 
 # custom_components/tmb/www/ is served here so tmb-timetable-card.js can be
 # added to any dashboard as a Lovelace resource without a separate HACS

@@ -94,9 +94,13 @@
           "quiet_hours_enabled": "Enable quiet hours (skip polling during a fixed daily window)",
           "quiet_hours_start": "Quiet hours start",
           "quiet_hours_end": "Quiet hours end",
-          "auto_skip_no_service": "Skip polling a line when today's published timetable shows no service running right now"
+          "auto_skip_no_service": "Skip polling a line when today's published timetable shows no service running right now",
+          "enable_alerts": "Show metro service alerts"
         },
-        "description": "Poll interval, quiet hours, and automatic schedule-aware polling."
+        "description": "Poll interval, quiet hours, and automatic schedule-aware polling.",
+        "data_description": {
+          "enable_alerts": "Fetch TMB metro service notices and show them on metro sensors and in a dedicated alerts sensor"
+        }
       }
     },
     "error": {
