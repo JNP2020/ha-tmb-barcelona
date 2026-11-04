@@ -6,19 +6,22 @@ from datetime import timedelta
 from pathlib import Path
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant, ServiceCall, ServiceResponse, SupportsResponse
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from homeassistant.loader import async_get_integration
 
+from .alerts_coordinator import TmbAlertsCoordinator
 from .api import TmbApiClient, TmbApiError
 from .const import (
+    CARD_JS_FILENAME,
     CONF_APP_ID,
     CONF_APP_KEY,
     CONF_AUTO_SKIP_NO_SERVICE,
+    CONF_ENABLE_ALERTS,
     CONF_LINE_CODE,
     CONF_LINE_COLOR,
     CONF_MODE,
@@ -33,6 +36,7 @@ from .const import (
     DOMAIN,
     FRONTEND_URL_BASE,
     MODE_BUS,
+    MODE_METRO,
 )
 from .coordinator import TmbCoordinator
 from .gtfs import GtfsScheduleCache
@@ -98,9 +102,24 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     )
     await coordinator.async_config_entry_first_refresh()
 
+    # Alerts are metro-only and optional (default on, only when a metro item
+    # is configured). A failed first fetch must not block arrival sensors.
+    alerts_coordinator = None
+    wants_alerts = entry.options.get(CONF_ENABLE_ALERTS, True) and any(
+        item.get(CONF_MODE) == MODE_METRO for item in items
+    )
+    if wants_alerts:
+        alerts_coordinator = TmbAlertsCoordinator(hass, client)
+        await alerts_coordinator.async_refresh()
+        if not alerts_coordinator.last_update_success:
+            _LOGGER.warning(
+                "Metro alerts unavailable at startup; will retry automatically"
+            )
+
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "client": client,
         "coordinator": coordinator,
+        "alerts_coordinator": alerts_coordinator,
     }
 
     entry.async_on_unload(entry.add_update_listener(_async_update_listener))
@@ -231,15 +250,29 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
     dashboards manage resources via the user's own ui-lovelace.yaml, which
     this can't safely edit, so those users still add it manually (README).
     """
-    resource_url = f"{FRONTEND_URL_BASE}/tmb-timetable-card.js"
+    base_url = f"{FRONTEND_URL_BASE}/{CARD_JS_FILENAME}"
     try:
+        # Cache-bust with the integration's version: at a fixed URL, browsers
+        # and the frontend's module cache keep serving the first copy of the
+        # card they loaded even after the integration is updated.
+        integration = await async_get_integration(hass, DOMAIN)
+        resource_url = f"{base_url}?v={integration.version}"
         lovelace_data = hass.data.get("lovelace")
         if lovelace_data is None or lovelace_data.resource_mode != "storage":
             return
         resources = lovelace_data.resources
         await resources.async_get_info()  # ensures the collection is loaded
-        if any(item.get("url") == resource_url for item in resources.async_items() or []):
-            return
+        for item in resources.async_items() or []:
+            url = item.get("url", "")
+            if url == resource_url:
+                return
+            if url.split("?", 1)[0] == base_url:
+                # Ours (or hand-added by README steps) at a stale version.
+                await resources.async_update_item(
+                    item["id"], {"res_type": "module", "url": resource_url}
+                )
+                _LOGGER.debug("Updated Lovelace resource to %s", resource_url)
+                return
         await resources.async_create_item({"res_type": "module", "url": resource_url})
         _LOGGER.debug("Registered %s as a Lovelace resource", resource_url)
     except Exception:  # noqa: BLE001 - never let this block sensor setup
@@ -247,6 +280,6 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> None:
             "Could not auto-register the tmb-timetable-card dashboard "
             "resource; add %s manually instead (Settings -> Dashboards -> "
             "Resources — see the README).",
-            resource_url,
+            base_url,
             exc_info=True,
         )

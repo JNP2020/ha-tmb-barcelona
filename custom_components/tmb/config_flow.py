@@ -13,7 +13,6 @@ from math import atan2, cos, radians, sin, sqrt
 from typing import Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigEntry, ConfigFlow, OptionsFlow
 from homeassistant.core import callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
@@ -34,6 +33,7 @@ from .const import (
     CONF_APP_ID,
     CONF_APP_KEY,
     CONF_AUTO_SKIP_NO_SERVICE,
+    CONF_ENABLE_ALERTS,
     CONF_LINE_CODE,
     CONF_LINE_COLOR,
     CONF_LINE_NAME,
@@ -290,7 +290,7 @@ class TmbConfigFlow(ConfigFlow, domain=DOMAIN):
 
     @staticmethod
     @callback
-    def async_get_options_flow(config_entry: ConfigEntry) -> "TmbOptionsFlow":
+    def async_get_options_flow(config_entry: ConfigEntry) -> TmbOptionsFlow:
         return TmbOptionsFlow()
 
 
@@ -356,6 +356,10 @@ class TmbOptionsFlow(OptionsFlow):
                 vol.Required(
                     CONF_AUTO_SKIP_NO_SERVICE,
                     default=options.get(CONF_AUTO_SKIP_NO_SERVICE, False),
+                ): BooleanSelector(),
+                vol.Required(
+                    CONF_ENABLE_ALERTS,
+                    default=options.get(CONF_ENABLE_ALERTS, True),
                 ): BooleanSelector(),
             }
         )

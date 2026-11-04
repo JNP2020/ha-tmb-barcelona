@@ -344,7 +344,9 @@ TmbTimetableCard.getConfigElement = function () {
   return document.createElement("tmb-timetable-card-editor");
 };
 
-customElements.define("tmb-timetable-card", TmbTimetableCard);
+if (!customElements.get("tmb-timetable-card")) {
+  customElements.define("tmb-timetable-card", TmbTimetableCard);
+}
 
 /**
  * Visual editor for tmb-timetable-card. A plain custom element (same
@@ -572,7 +574,9 @@ class TmbTimetableCardEditor extends HTMLElement {
   }
 }
 
-customElements.define("tmb-timetable-card-editor", TmbTimetableCardEditor);
+if (!customElements.get("tmb-timetable-card-editor")) {
+  customElements.define("tmb-timetable-card-editor", TmbTimetableCardEditor);
+}
 
 window.customCards = window.customCards || [];
 window.customCards.push({
